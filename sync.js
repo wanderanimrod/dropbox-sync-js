@@ -2,8 +2,8 @@ var dbox  = require("dbox");
 var fs = require("fs");
 var async = require("async");
 
-var allow_uploads = true;
-var allow_remote_deletes = true;
+var allow_uploads = false;
+var allow_remote_deletes = false;
 var allow_downloads = true;
 var allow_local_deletes = true;
 
@@ -31,8 +31,7 @@ var finished;
 
 /**************************** Main Functions *******************************/
 
-function main()
-{
+function main() {
 	if(process.argv.length == 2)
 	{
 		doSync();
@@ -73,8 +72,8 @@ function main()
 	}
 }
 
-function doSync(callback)
-{	
+function doSync(callback) {
+
 	remote_delta_finished = false;
 	local_delta_finished = false;
 	
@@ -88,8 +87,7 @@ function doSync(callback)
 }
 
 
-function addExcludePattern(pattern)
-{
+function addExcludePattern(pattern) {
 	async.series(
 	[
 		readSettings,
@@ -117,8 +115,7 @@ function addExcludePattern(pattern)
 	});
 }
 
-function removeExcludePattern(pattern)
-{
+function removeExcludePattern(pattern) {
 	async.series(
 	[
 		readSettings,
@@ -153,8 +150,7 @@ function removeExcludePattern(pattern)
 	});
 }
 
-function getExcludePatterns()
-{
+function getExcludePatterns() {
 	async.series(
 	[
 		readSettings,
@@ -174,8 +170,7 @@ function getExcludePatterns()
 	});
 }
 
-function getQuota()
-{
+function getQuota() {
 	async.series(
 	[
 		readSettings,
@@ -195,8 +190,7 @@ function getQuota()
 
 /****************************** Read Settings *********************************/
 
-function readSettings(callback)
-{
+function readSettings(callback) {
 	sync_data_path = getUserHome() + "/" + sync_data_file;
 	settings_path = getUserHome() + "/" + settings_file;
 
@@ -218,8 +212,7 @@ function readSettings(callback)
 }
 
 
-function readSyncDataFile(callback)
-{
+function readSyncDataFile(callback) {
 	//open sync data file
 	fs.readFile(sync_data_path, "utf8", function(error, data)
 	{
@@ -240,8 +233,7 @@ function readSyncDataFile(callback)
 
 /**************************** Initial Setup Functions *******************************/
 
-function initialSetup(callback)
-{
+function initialSetup(callback) {
 	async.series(
 	[
 		getAppKey,
@@ -256,8 +248,7 @@ function initialSetup(callback)
 }
 
 
-function getAppKey(callback)
-{
+function getAppKey(callback) {
 	if(!settings.app_key)
 	{
 		console.log();
@@ -285,8 +276,7 @@ function getAppKey(callback)
 }
 
 
-function getAppSecret(callback)
-{
+function getAppSecret(callback) {
 	if(!settings.app_key.app_secret)
 	{
 		console.log("Enter app secret:");
@@ -308,8 +298,7 @@ function getAppSecret(callback)
 /**
  * Authorise the application to have access to the users dropbox account.
  */
-function authorize(callback)
-{
+function authorize(callback) {
 	if(!settings.access_token)
 	{
 		console.log("Authorizing...");
@@ -502,117 +491,12 @@ function getRemoteDelta()
 	});
 }
 
-function getLocalDelta()
-{
-	console.log("Syncing Local Changes...");
-	
-	listLocalFiles(settings.local_sync_dir, function(error, file_list) 
-	{
-		if (error) throw error;
-		
-		// for each local file
-		for(var path in file_list)
-		{
-			var file_data = file_list[path];
-			var sync_data = saved_sync_data.files[path];
-			var excluded = isExcluded(path);
-
-			if(!sync_data && !excluded && file_data.type == 'f')
-			{
-				// File has never been synced so it needs to be uploaded.
-				addTask("upload", upload, {local_path: path});
-			}
-			else if(!sync_data && !excluded && file_data.type == 'd')
-			{
-				// Directory has never been synced so it needs to be uploaded.
-				addTask("mkdir remote", mkdirRemote, {local_path: path});
-			}
-			else if(sync_data && !excluded && !sync_data.ignore && file_data.mod_time > new Date(Date.parse(sync_data.date)))
-			{
-				// File has been modified after last sync.
-				addTask("upload", upload, {local_path: path});
-			}
-		}
-		
-		// for each local file synced previously
-		for(path in saved_sync_data.files)
-		{
-			var file_data = file_list[path];
-			var sync_data = saved_sync_data.files[path];
-			var excluded = isExcluded(path);
-			
-			if(excluded && (!sync_data.type || sync_data.type == "f"))
-			{
-				//File has been previously synced but is now excluded
-				addTask("rm remote", rmRemote, {local_path: path});
-			}
-			else if(excluded && (!sync_data.type || sync_data.type == "d"))
-			{
-				//Directory has been previously synced but is now excluded
-				addTask("rmdir remote", rmdirRemote, {local_path: path});
-			}
-			else if(!file_data && (!sync_data.type || sync_data.type == "f"))
-			{
-				//File previously synced has been deleted
-				addTask("rm remote", rmRemote, {local_path: path});
-			}
-			else if(!file_data && sync_data.type && sync_data.type == "d" && path != settings.local_sync_dir)
-			{
-				//Directory previously synced has been deleted
-				addTask("rmdir remote", rmdirRemote, {local_path: path});
-			}
-		}
-		
-		local_delta_finished = true;
-		if(queue.length() == 0)
-		{
-			queue.drain();
-		}
-	});
+function getLocalDelta() {
+	local_delta_finished = true;
+	if(queue.length() == 0) {
+		queue.drain();
+	}	
 }
-
-
-
-function listLocalFiles(dir, callback)
-{
-	var results = {};
-	fs.readdir(dir, function(error, list) 
-	{
-		if (error) return callback(error);
-		var i = 0;
-		(function next() 
-		{
-			var file = list[i++];
-			if (!file) return callback(null, results);
-			file = dir + '/' + file;
-			fs.stat(file, function(err, stat) 
-			{
-				if (stat && stat.isDirectory()) 
-				{
-					var file_data = {};
-					file_data.type = "d";
-					results[file] = file_data;
-					
-					listLocalFiles(file, function(err, res) 
-					{
-						results = collect(results, res);
-						next();
-					});
-				} 
-				else 
-				{
-					var file_data = {};
-					file_data.type = "f"; 
-					file_data.mod_time = stat.mtime;
-					results[file] = file_data;
-					next();
-				}
-			});
-		})();
-	});
-}
-
-
 
 
 /**************************** Task Processing *********************************/
@@ -976,8 +860,6 @@ function rmdirRemote(task, callback)
 	}
 }
 
-
-
 fs.removeRecursive = function(path, callback)
 {
 	var self = this;
@@ -1079,9 +961,6 @@ fs.removeRecursive = function(path, callback)
 	});
 };
 
-
-
-
 function removeFileSyncData(local_path)
 {
 	delete saved_sync_data.files[local_path];
@@ -1138,7 +1017,7 @@ function isExcluded(path)
 function logError(error)
 {
 	errors[errors.length] = error;
-	console.log(error);
+	console.log(Date(), error);
 }
 
 
