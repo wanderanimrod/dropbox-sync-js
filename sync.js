@@ -502,12 +502,117 @@ function getRemoteDelta()
 	});
 }
 
-function getLocalDelta() {
-	local_delta_finished = true;
-	if(queue.length() == 0) {
-		queue.drain();
-	}	
+function getLocalDelta()
+{
+	console.log("Syncing Local Changes...");
+	
+	listLocalFiles(settings.local_sync_dir, function(error, file_list) 
+	{
+		if (error) throw error;
+		
+		// for each local file
+		for(var path in file_list)
+		{
+			var file_data = file_list[path];
+			var sync_data = saved_sync_data.files[path];
+			var excluded = isExcluded(path);
+
+			if(!sync_data && !excluded && file_data.type == 'f')
+			{
+				// File has never been synced so it needs to be uploaded.
+				addTask("upload", upload, {local_path: path});
+			}
+			else if(!sync_data && !excluded && file_data.type == 'd')
+			{
+				// Directory has never been synced so it needs to be uploaded.
+				addTask("mkdir remote", mkdirRemote, {local_path: path});
+			}
+			else if(sync_data && !excluded && !sync_data.ignore && file_data.mod_time > new Date(Date.parse(sync_data.date)))
+			{
+				// File has been modified after last sync.
+				addTask("upload", upload, {local_path: path});
+			}
+		}
+		
+		// for each local file synced previously
+		for(path in saved_sync_data.files)
+		{
+			var file_data = file_list[path];
+			var sync_data = saved_sync_data.files[path];
+			var excluded = isExcluded(path);
+			
+			if(excluded && (!sync_data.type || sync_data.type == "f"))
+			{
+				//File has been previously synced but is now excluded
+				addTask("rm remote", rmRemote, {local_path: path});
+			}
+			else if(excluded && (!sync_data.type || sync_data.type == "d"))
+			{
+				//Directory has been previously synced but is now excluded
+				addTask("rmdir remote", rmdirRemote, {local_path: path});
+			}
+			else if(!file_data && (!sync_data.type || sync_data.type == "f"))
+			{
+				//File previously synced has been deleted
+				addTask("rm remote", rmRemote, {local_path: path});
+			}
+			else if(!file_data && sync_data.type && sync_data.type == "d" && path != settings.local_sync_dir)
+			{
+				//Directory previously synced has been deleted
+				addTask("rmdir remote", rmdirRemote, {local_path: path});
+			}
+		}
+		
+		local_delta_finished = true;
+		if(queue.length() == 0)
+		{
+			queue.drain();
+		}
+	});
 }
+
+
+
+function listLocalFiles(dir, callback)
+{
+	var results = {};
+	fs.readdir(dir, function(error, list) 
+	{
+		if (error) return callback(error);
+		var i = 0;
+		(function next() 
+		{
+			var file = list[i++];
+			if (!file) return callback(null, results);
+			file = dir + '/' + file;
+			fs.stat(file, function(err, stat) 
+			{
+				if (stat && stat.isDirectory()) 
+				{
+					var file_data = {};
+					file_data.type = "d";
+					results[file] = file_data;
+					
+					listLocalFiles(file, function(err, res) 
+					{
+						results = collect(results, res);
+						next();
+					});
+				} 
+				else 
+				{
+					var file_data = {};
+					file_data.type = "f"; 
+					file_data.mod_time = stat.mtime;
+					results[file] = file_data;
+					next();
+				}
+			});
+		})();
+	});
+}
+
+
 
 
 /**************************** Task Processing *********************************/
