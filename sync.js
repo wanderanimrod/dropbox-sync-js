@@ -421,7 +421,7 @@ queue.drain = function()
 	}
 	else if(local_delta_finished && remote_delta_finished)
 	{
-		console.log("Finished.");
+		console.log(Date(), " | Finished.");
 		
 		if(errors.length > 0)
 	    {
@@ -441,7 +441,7 @@ queue.drain = function()
 
 function getRemoteDelta()
 {
-	console.log("Syncing Remote Changes...");
+	console.log(Date(), " | Syncing Remote Changes...");
 
 	client.delta({ cursor:saved_sync_data.cursor }, function(status, reply) 
 	{
@@ -491,7 +491,7 @@ function getRemoteDelta()
 		}
 		else
 		{
-			console.log("ERROR: Getting remote delta");
+			console.log(Date(), " | ERROR: Getting remote delta");
 		}
 		
 		remote_delta_finished = true;
@@ -600,7 +600,7 @@ function upload(task, callback)
 				else if(status == 503 || status == null)
 				{
 					// Rate limit reached, put back on queue to try again later.
-					console.log("ERROR: 503 - Rate limited - will try again.");
+					console.log(Date(), " | ERROR: 503 - Rate limited - will try again.");
 					queue.push(task);
 				}
 				else if(status == 400 && metadata.error.indexOf("ignored file list") !== -1)
@@ -634,7 +634,7 @@ function download(task, callback)
 {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log("Downloading " + local_path + " <-- " + remote_path);
+	console.log(Date(), " | Downloading " + local_path + " <-- " + remote_path);
 
 	if(allow_downloads)
 	{
@@ -654,7 +654,7 @@ function download(task, callback)
 			else if(status == 503)
 			{
 				//rate limit reached, put back on queue to try again later.
-				console.log("ERROR: 503 - Rate limited - will try again.");
+				console.log(Date(), " | ERROR: 503 - Rate limited - will try again.");
 				queue.push(task);
 			}
 			else
@@ -681,7 +681,7 @@ function mkdirLocal(task, callback)
 {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log("Creating Local Directory " + local_path + " <-- " + remote_path);
+	console.log(Date(),  " | Creating Local Directory " + local_path + " <-- " + remote_path);
 
 	if(allow_downloads)
 	{
@@ -746,7 +746,7 @@ function rmLocal(task, callback)
 {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log("Deleting Local File " + local_path + " x-- " + remote_path);
+	console.log(Date(),  " | Deleting Local File " + local_path + " x-- " + remote_path);
 	
 	if(allow_local_deletes)
 	{
@@ -811,7 +811,7 @@ function rmdirLocal(task, callback)
 {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log("Deleting Local Directory " + local_path + " x-- " + remote_path);
+	console.log(Date(), " | Deleting Local Directory " + local_path + " x-- " + remote_path);
 	
 	if(allow_local_deletes)
 	{
