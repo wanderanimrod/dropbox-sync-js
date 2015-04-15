@@ -6,6 +6,7 @@ var allow_uploads = false;
 var allow_remote_deletes = false;
 var allow_downloads = true;
 var allow_local_deletes = true;
+var download_timeout_seconds = 60;
 
 var sync_data_file = ".dropbox_sync_data";
 var sync_data_path = null;
@@ -26,7 +27,7 @@ var remote_delta_finished = false;
 var queue = async.queue(doTask, 1);
 
 
-var finished;
+var finished, syncTimeout;
 
 
 /**************************** Main Functions *******************************/
@@ -73,11 +74,16 @@ function main() {
 }
 
 function doSync(callback) {
-
 	remote_delta_finished = false;
 	local_delta_finished = false;
 	
 	finished = callback;
+
+	syncTimeout = setTimeout(function() {
+		console.log(Date(), 'Sync timed out. Killing myself to make way for the next try.');
+		process.exit(8);
+	}, download_timeout_seconds * 1000);
+
 	async.series(
 	[
 		readSettings,
@@ -410,6 +416,7 @@ queue.drain = function()
 	}
 	else if(local_delta_finished && remote_delta_finished)
 	{
+		clearTimeout(syncTimeout);
 		console.log(Date(), " | Finished.");
 		
 		if(errors.length > 0)
@@ -561,8 +568,7 @@ function getLocalPath(remote_path)
 
 /****************************** File Operations *******************************/
 
-function upload(task, callback)
-{
+function upload(task, callback) {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
 	console.log("Uploading " + local_path + " --> " + remote_path);
@@ -619,37 +625,29 @@ function upload(task, callback)
 	}
 }
 
-function download(task, callback)
-{
+function download(task, callback) {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
+	var pending_request;
 	console.log(Date(), " | Downloading " + local_path + " <-- " + remote_path);
 
-	if(allow_downloads)
-	{
-		client.get(remote_path, function(status, data, metadata) 
-		{
-			if(status == 200)
-			{
-				fs.writeFile(local_path, data, function(error)
-				{
-					if(!error)
-					{
+	if(allow_downloads) {
+		pending_request = client.get(remote_path, function(status, data, metadata) {
+			if(status == 200) {
+				fs.writeFile(local_path, data, function(error) {
+					if(!error) {
 						//save sync data
 						setFileSyncData(local_path, metadata.revision, "f");
 					}
 				});
 			}
-			else if(status == 503)
-			{
+			else if(status == 503) {
 				//rate limit reached, put back on queue to try again later.
 				console.log(Date(), " | ERROR: 503 - Rate limited - will try again.");
 				queue.push(task);
 			}
-			else
-			{
-				logError(
-				{
+			else {
+				logError({
 					code: status,
 					message: "Error downloading file",
 					local_path : local_path,
@@ -660,8 +658,7 @@ function download(task, callback)
 			callback();
 		});
 	}
-	else
-	{
+	else {
 		callback();
 	}
 }
