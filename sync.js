@@ -2,11 +2,11 @@ var dbox  = require("dbox");
 var fs = require("fs");
 var async = require("async");
 
-var allow_uploads = false;
+var allow_uploads = true;
 var allow_remote_deletes = false;
 var allow_downloads = true;
 var allow_local_deletes = true;
-var download_timeout_seconds = 300;
+var download_timeout_seconds = 3300;
 
 var sync_data_file = ".dropbox_sync_data";
 var sync_data_path = null;
@@ -80,7 +80,7 @@ function doSync(callback) {
 	finished = callback;
 
 	syncTimeout = setTimeout(function() {
-		console.log(Date(), 'Sync timed out. Killing myself to make way for the next try.');
+		console.log(Date(), 'Sync timed out after ' + download_timeout_seconds + ' seconds. Killing myself to make way for the next try.');
 		process.exit(8);
 	}, download_timeout_seconds * 1000);
 
@@ -435,20 +435,6 @@ queue.drain = function()
 	}
 };
 
-function getRemoteLocalDiff(callback) {
-	console.log(Date(), " | Finding remote files not yet available locally ...");
-	client.readdir(settings.remote_sync_dir, function(status, reply) {
-		reply.forEach(function(remote_path) {
-			var local_path = getLocalPath(remote_path);
-			if(!fs.existsSync(local_path)) {
-				console.log('file ' + local_path + ' does not exist locally yet.');
-				addTask("download", download, {remote_path: remote_path, local_path: local_path});
-			}
-		});
-		callback();
-	});
-}
-
 function getRemoteDelta() {
 	console.log(Date(), " | Syncing Remote Changes...");
 
@@ -494,12 +480,29 @@ function getRemoteDelta() {
 			console.log(Date(), " | ERROR: Getting remote delta");
 		}
 
+		// Upload sync logs
+		addTask("upload", upload, {local_path: settings.local_sync_dir + '/js-sync-log'})
+
 		getRemoteLocalDiff(function() {
 			remote_delta_finished = true;
 			if(queue.length() == 0) {
 				queue.drain();
 			}
+		});		
+	});
+}
+
+function getRemoteLocalDiff(callback) {
+	console.log(Date(), " | Finding remote files not yet available locally ...");
+	client.readdir(settings.remote_sync_dir, function(status, reply) {
+		reply.forEach(function(remote_path) {
+			var local_path = getLocalPath(remote_path);
+			if(!fs.existsSync(local_path)) {
+				console.log('file ' + local_path + ' does not exist locally yet.');
+				addTask("download", download, {remote_path: remote_path, local_path: local_path});
+			}
 		});
+		callback();
 	});
 }
 
@@ -576,7 +579,7 @@ function getLocalPath(remote_path)
 function upload(task, callback) {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log("Uploading " + local_path + " --> " + remote_path);
+	console.log(Date(), "Uploading " + local_path + " --> " + remote_path);
 
 	if(allow_uploads)
 	{
