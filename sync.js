@@ -27,7 +27,7 @@ var remote_delta_finished = false;
 var queue = async.queue(doTask, 1);
 
 
-var finished, syncTimeout;
+var finished, syncTimeout, machine_name;
 
 
 /**************************** Main Functions *******************************/
@@ -59,6 +59,10 @@ function main() {
 		else if(process.argv[2] == "quota")
 		{
 			getQuota();
+		}
+		else if(process.argv[2] == "machine") {
+			machine_name = process.argv[3];
+			console.log("Machine name = ", machine_name);
 		}
 		else
 		{
@@ -481,7 +485,7 @@ function getRemoteDelta() {
 		}
 
 		// Upload sync logs
-		addTask("upload", upload, {local_path: settings.local_sync_dir + '/js-sync-log'})
+		addTask("upload", upload, {local_path: settings.local_sync_dir + '/js-sync-log-' + machine_name})
 
 		getRemoteLocalDiff(function() {
 			remote_delta_finished = true;
