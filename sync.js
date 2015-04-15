@@ -498,7 +498,7 @@ function getRemoteLocalDiff(callback) {
 		reply.forEach(function(remote_path) {
 			var local_path = getLocalPath(remote_path);
 			if(!fs.existsSync(local_path)) {
-				console.log('file ' + local_path + ' does not exist locally yet.');
+				console.log(Date(), ' | file ' + local_path + ' does not exist locally yet.');
 				addTask("download", download, {remote_path: remote_path, local_path: local_path});
 			}
 		});
