@@ -62,7 +62,7 @@ function main() {
 		}
 		else if(process.argv[2] == "machine") {
 			machine_name = process.argv[3];
-			console.log("Machine name = ", machine_name);
+			doSync();
 		}
 		else
 		{
@@ -583,7 +583,7 @@ function getLocalPath(remote_path)
 function upload(task, callback) {
 	var local_path = task.options.local_path;
 	var remote_path = task.options.remote_path;
-	console.log(Date(), "Uploading " + local_path + " --> " + remote_path);
+	console.log(Date(), "| Uploading " + local_path + " --> " + remote_path);
 
 	if(allow_uploads)
 	{
