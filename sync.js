@@ -6,7 +6,7 @@ var allow_uploads = false;
 var allow_remote_deletes = false;
 var allow_downloads = true;
 var allow_local_deletes = true;
-var download_timeout_seconds = 60;
+var download_timeout_seconds = 300;
 
 var sync_data_file = ".dropbox_sync_data";
 var sync_data_path = null;
@@ -435,21 +435,30 @@ queue.drain = function()
 	}
 };
 
-function getRemoteDelta()
-{
+function getRemoteLocalDiff(callback) {
+	console.log(Date(), " | Finding remote files not yet available locally ...");
+	client.readdir(settings.remote_sync_dir, function(status, reply) {
+		reply.forEach(function(remote_path) {
+			var local_path = getLocalPath(remote_path);
+			if(!fs.existsSync(local_path)) {
+				console.log('file ' + local_path + ' does not exist locally yet.');
+				addTask("download", download, {remote_path: remote_path, local_path: local_path});
+			}
+		});
+		callback();
+	});
+}
+
+function getRemoteDelta() {
 	console.log(Date(), " | Syncing Remote Changes...");
 
-	client.delta({ cursor:saved_sync_data.cursor }, function(status, reply) 
-	{
+	client.delta({ cursor:saved_sync_data.cursor }, function(status, reply) {
 		saved_sync_data.cursor = reply.cursor;
-		if(status == 200)
-		{
-			reply.entries.forEach(function(entry)
-			{
+		if(status == 200) {
+			reply.entries.forEach(function(entry) {
 				var remote_path = entry[0];
 				var remote_data = entry[1];
-				if(remote_data)
-				{
+				if(remote_data) {
 					// Use remote_data.path to preserve case in new filenames.
 					remote_path = remote_data.path;
 				}
@@ -458,28 +467,23 @@ function getRemoteDelta()
 				var sync_data = saved_sync_data.files[local_path];
 				var excluded = isExcluded(local_path);
 				
-				if(!excluded && !remote_data && sync_data && sync_data.type == "f")
-				{
+				if(!excluded && !remote_data && sync_data && sync_data.type == "f") {
 					// Remote file was deleted and there is a local file, so delete local file
 					addTask("rm local", rmLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(!excluded && !remote_data && sync_data && sync_data.type == "d")
-				{
+				else if(!excluded && !remote_data && sync_data && sync_data.type == "d") {
 					// Remote directory was deleted and there is a local directory, so delete local directory
 					addTask("rmdir local", rmdirLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(!excluded && remote_data && remote_data.is_dir && !sync_data)
-				{
+				else if(!excluded && remote_data && remote_data.is_dir && !sync_data) {
 					// Remote directory was created and we don't have it, so create local directory
 					addTask("mkdir local", mkdirLocal, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(!excluded && remote_data && !remote_data.is_dir && !sync_data)
-				{
+				else if(!excluded && remote_data && !remote_data.is_dir && !sync_data) {
 					// Remote file was added and we don't have it, so download it
 					addTask("download", download, {remote_path: remote_path, local_path: local_path});
 				}
-				else if(!excluded && remote_data && !remote_data.is_dir && sync_data && remote_data.revision > sync_data.rev)
-				{
+				else if(!excluded && remote_data && !remote_data.is_dir && sync_data && remote_data.revision > sync_data.rev) {
 					// Remote file was changed and is a later revision than local one
 					addTask("download", download, {remote_path: remote_path, local_path: local_path});
 				}
@@ -489,12 +493,13 @@ function getRemoteDelta()
 		{
 			console.log(Date(), " | ERROR: Getting remote delta");
 		}
-		
-		remote_delta_finished = true;
-		if(queue.length() == 0)
-		{
-			queue.drain();
-		}
+
+		getRemoteLocalDiff(function() {
+			remote_delta_finished = true;
+			if(queue.length() == 0) {
+				queue.drain();
+			}
+		});
 	});
 }
 
