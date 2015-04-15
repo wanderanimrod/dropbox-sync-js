@@ -6,7 +6,7 @@ var allow_uploads = true;
 var allow_remote_deletes = false;
 var allow_downloads = true;
 var allow_local_deletes = true;
-var download_timeout_seconds = 3300;
+var download_timeout_seconds = 3000;
 
 var sync_data_file = ".dropbox_sync_data";
 var sync_data_path = null;
