@@ -485,7 +485,7 @@ function getRemoteDelta() {
 		}
 
 		// Upload sync logs
-		addTask("upload", upload, {local_path: settings.local_sync_dir + '/js-sync-log-' + machine_name})
+		// addTask("upload", upload, {local_path: settings.local_sync_dir + '/js-sync-log-' + machine_name})
 
 		getRemoteLocalDiff(function() {
 			remote_delta_finished = true;
